@@ -1,38 +1,60 @@
-// https://forum.babylonjs.com/t/drawing-a-polygon-in-3d-space-and-extruding-it/27666
-import * as BABYLON from "babylonjs"
-import { Scene } from "babylonjs"
+import { ThreeScene } from "./initScene"
+import * as dat from "dat.gui"
 
-const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement
-const engine = new BABYLON.Engine(canvas, true)
-export let scene: Scene = new BABYLON.Scene(engine)
-var light = new BABYLON.PointLight('light', new BABYLON.Vector3(0, 1, 0), scene);
-light.position = new BABYLON.Vector3(0, 5, 0);
+const threeScene = new ThreeScene()
+const gui = new dat.GUI()
 
-let camera = new BABYLON.ArcRotateCamera(
-	"Camera",
-	Math.PI / 2,
-	Math.PI / 2,
-	2,
-	new BABYLON.Vector3(0, 0, 0),
-	scene
-)
-camera.setPosition(new BABYLON.Vector3(0, 0, -20))
-camera.attachControl(canvas, true)
+const extrudeFolder = gui.addFolder("Extrude")
+const extrudeOptions = {
+	extrusionHeight: 5,
+}
 
-const createScene = () => {
-	const myPoints = [
-		new BABYLON.Vector3(-2, 0, 0),
-		new BABYLON.Vector3(0, 1, 0),
-		new BABYLON.Vector3(2, -1, 0),
-		new BABYLON.Vector3(2, 1, 0),
-		new BABYLON.Vector3(12, 1, 0),
-		new BABYLON.Vector3(-2, 0, 0),
-	]
-	let lines = BABYLON.MeshBuilder.CreateLines("lines", { points: myPoints }, scene);
-};
+var drawModeController = gui
+	.add(threeScene, "drawMode", false)
+	.onChange((value) => {
+		threeScene.drawMode = value
+		// Update move mode to false when draw mode is enabled
+		if (value) {
+			threeScene.moveMode = false
+			moveModeController.updateDisplay()
+		}
+	})
+var moveModeController = gui
+	.add(threeScene, "moveMode", false)
+	.onChange((value) => {
+		threeScene.moveMode = value
+		// Update drawmode to false when move mode is enabled
+		if (value) {
+			threeScene.drawMode = false
+			drawModeController.updateDisplay()
+		}
+	})
 
-createScene();
+extrudeFolder.add(extrudeOptions, "extrusionHeight", 0, 5).onChange((value) => {
+	// Update the extrusion height of the selected object
+	console.log(threeScene.selectedObject)
+	if (threeScene.selectedObject) {
+		threeScene.selectedObject.scale.y = value
+	}
+})
 
-engine.runRenderLoop(() => {
-	scene.render();
-});
+document.body.appendChild(threeScene.renderer.domElement)
+
+threeScene.addHorizontalPlane()
+
+threeScene.renderer.setAnimationLoop(() => {
+	threeScene.renderer.render(threeScene.scene, threeScene.camera)
+})
+
+window.addEventListener("pointermove", (e) => {
+	threeScene.onPointerMove(e)
+})
+
+window.addEventListener("mousedown", threeScene.onPointerDown.bind(threeScene))
+window.addEventListener("pointerup", threeScene.onPointerUp.bind(threeScene))
+
+window.addEventListener("resize", () => {
+	threeScene.camera.aspect = window.innerWidth / window.innerHeight
+	threeScene.camera.updateProjectionMatrix()
+	threeScene.renderer.setSize(window.innerWidth, window.innerHeight)
+})
