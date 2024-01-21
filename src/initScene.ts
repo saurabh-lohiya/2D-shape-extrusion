@@ -1,6 +1,6 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/Addons.js"
-import { IPolygon, IPolygonCords, Mode } from "."
+import { Mode } from "."
 
 export class ThreeScene {
 	private scene: THREE.Scene
@@ -17,11 +17,8 @@ export class ThreeScene {
 	private controlPoints: THREE.Mesh[]
 	private plane: THREE.Mesh
 	private planeId: number
-	private offset: THREE.Vector3[]
+	private offset: THREE.Vector3
 	private intersects: THREE.Intersection[]
-	private polygonId: number
-	private polygons: IPolygon
-	private polygonCords: IPolygonCords
 
 	constructor() {
 		this.scene = new THREE.Scene()
@@ -46,11 +43,8 @@ export class ThreeScene {
 		this.planeId = this.plane.id
 		this.axisHelperId = this.axisHelper.id
 		this.controlPoints = []
-		this.offset = []
+		this.offset = new THREE.Vector3()
 		this.intersects = []
-		this.polygonId = 0
-		this.polygons = {}
-		this.polygonCords = {}
 		this.setupCamera()
 		this.addObjectsToScene(this.axisHelper, this.camera, this.light, this.plane)
 		this.setAnimationLoopForRenderer()
@@ -86,7 +80,6 @@ export class ThreeScene {
 	updateMode(mode: Mode) {
 		this.mode = mode
 		if (mode !== this.mode && this.mode === Mode.Draw) {
-			this.polygonId += 1
 			this.controlPoints = []
 		}
 	}
@@ -111,30 +104,17 @@ export class ThreeScene {
 		) {
 			this.controls.enabled = false
 			this.selectedObject.position.copy(
-				this.intersects[0].point.sub(this.offset[0])
+				this.intersects[0].point.sub(this.offset)
 			)
 			this.selectedObject.position.y = 0
-			this.selectedObject.userData.controlPoints.forEach(
-				(cp: THREE.Mesh, index: number) => {
-					cp.position.copy(this.intersects[0].point.sub(this.offset[index + 1]))
-				}
-			)
+			console.log(this.selectedObject.userData.controlPoints)
 		}
 	}
 
 	onPointerUp(event: MouseEvent) {
 		if (this.mode === Mode.Move || this.mode === Mode.Draw) {
-			this.selectedObject?.userData.controlPoints.forEach(
-				(point: THREE.Mesh) => {
-					const cp = new THREE.Mesh(
-						new THREE.SphereGeometry(0.1, 80, 80),
-						new THREE.MeshBasicMaterial({ color: "red" })
-					)
-					cp.position.set(point.position.x, point.position.y, point.position.z)
-					this.scene.add(cp)
-				}
-			)
 			this.selectedObject = null
+			// this.offset = []
 		}
 		this.controls.enabled = true
 	}
@@ -158,27 +138,19 @@ export class ThreeScene {
 						new THREE.SphereGeometry(0.1, 80, 80),
 						new THREE.MeshBasicMaterial({ color: "red" })
 					)
+					// Placing the control point on the plane
 					cp.position.copy(this.intersects[0].point)
+					cp.position.y = 0
 					this.controlPoints.push(cp)
-					cp.userData.polgonId = this.polygonId
-					cp.userData.name = "controlPoint"
 					this.scene.add(cp)
 				}
 			}
 			if (this.mode === Mode.Move) {
 				this.selectedObject = this.intersects[0].object as THREE.Mesh
-				this.offset[0]
-					.copy(this.intersects[0].point)
-					.sub(this.selectedObject.position)
-				if (this.selectedObject.userData.controlPoints) {
-					this.selectedObject.userData.controlPoints.forEach(
-						(cp: THREE.Vector3, index: number) => {
-							this.offset[index + 1]
-								.copy(this.intersects[0].point)
-								.sub(new THREE.Vector3(cp.x, 0, cp.z))
-						}
-					)
-				}
+				this.offset.copy(
+					this.intersects[0].point.sub(this.selectedObject.position)
+				)
+				this.offset.y = 0
 			}
 		} else if (event.buttons === 2) {
 			if (this.mode === Mode.Draw && this.controlPoints.length > 2) {
@@ -199,8 +171,9 @@ export class ThreeScene {
 					extrudeGeom,
 					new THREE.MeshPhongMaterial({ color: 0x00ff00 })
 				)
-				polygon.userData.id = this.polygonId
-				polygon.userData.controlPoints = this.controlPoints
+				for (let i = 0; i < this.controlPoints.length; i++) {
+					polygon.add(this.controlPoints[i])
+				}
 				this.controlPoints = []
 				this.scene.add(polygon)
 			}
