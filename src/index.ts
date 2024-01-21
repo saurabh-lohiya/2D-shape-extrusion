@@ -1,3 +1,4 @@
+import { Vector2 } from "three"
 import { ThreeScene } from "./initScene"
 import * as dat from "dat.gui"
 
@@ -6,6 +7,14 @@ export enum Mode {
 	Move = "move",
 	EditVertex = "editVertex",
 	Extrude = "extrude",
+}
+
+export interface IPolygon {
+	[key: number]: Vector2[]
+}
+
+export interface IPolygonCords {
+	[key: string]: number
 }
 interface IEnumMode {
 	[key: string]: Mode
@@ -40,8 +49,7 @@ window.addEventListener("pointermove", (e) => {
 })
 window.addEventListener("mousedown", threeScene.onPointerDown.bind(threeScene))
 window.addEventListener("pointerup", threeScene.onPointerUp.bind(threeScene))
-window.addEventListener("resize", () => {
-	threeScene.camera.aspect = window.innerWidth / window.innerHeight
-	threeScene.camera.updateProjectionMatrix()
-	threeScene.renderer.setSize(window.innerWidth, window.innerHeight)
-})
+window.addEventListener(
+	"resize",
+	threeScene.updateOnWindowResize.bind(threeScene)
+)
