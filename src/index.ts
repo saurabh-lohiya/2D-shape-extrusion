@@ -1,30 +1,7 @@
-import { Vector2 } from "three"
 import { ThreeScene } from "./initScene"
 import * as dat from "dat.gui"
+import { Mode, editMode } from "./utils/interface"
 
-export enum Mode {
-	Draw = "draw",
-	Move = "move",
-	EditVertex = "editVertex",
-	Extrude = "extrude",
-}
-
-export interface IPolygon {
-	[key: number]: Vector2[]
-}
-
-export interface IPolygonCords {
-	[key: string]: number
-}
-interface IEnumMode {
-	[key: string]: Mode
-}
-const editMode: IEnumMode = {
-	Draw: Mode.Draw,
-	Move: Mode.Move,
-	["Edit Vertex"]: Mode.EditVertex,
-	Extrude: Mode.Extrude,
-}
 const threeScene = new ThreeScene()
 
 const gui = new dat.GUI()
@@ -38,10 +15,13 @@ const extrudeFolder = gui.addFolder("Extrude")
 const extrudeOptions = {
 	extrusionHeight: 5,
 }
-extrudeFolder.add(extrudeOptions, "extrusionHeight", 0, 5).onChange((value) => {
-	// Update the extrusion height of the selected object
-	threeScene.extrudeSelectedShape(value)
-})
+
+extrudeFolder
+	.add(extrudeOptions, "extrusionHeight", 0.5, 5)
+	.onChange((value) => {
+		// Update the extrusion height of the selected object
+		threeScene.extrudeSelectedShape(value)
+	})
 
 document.body.appendChild(threeScene.renderer.domElement)
 window.addEventListener("pointermove", (e) => {

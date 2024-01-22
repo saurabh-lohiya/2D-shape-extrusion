@@ -1,24 +1,31 @@
 import * as THREE from "three"
 import { OrbitControls } from "three/examples/jsm/Addons.js"
-import { Mode } from "."
+import { Mode, ObjectType } from "./utils/interface"
+import {
+	addControlPoint,
+	createExtrudedPolygon,
+	createPlane,
+} from "./components"
 
 export class ThreeScene {
-	private scene: THREE.Scene
-	private camera: THREE.PerspectiveCamera
-	private light: THREE.Light
-	public renderer: THREE.WebGLRenderer
-	private raycaster: THREE.Raycaster
-	private controls: OrbitControls
+	private readonly scene: THREE.Scene
+	private readonly camera: THREE.PerspectiveCamera
+	private readonly mainLight: THREE.DirectionalLight
+	private readonly ambientLight: THREE.AmbientLight
+	public readonly renderer: THREE.WebGLRenderer
+	private readonly raycaster: THREE.Raycaster
+	private readonly controls: OrbitControls
+	private readonly axisHelper: THREE.AxesHelper
+	private readonly gridHelper: THREE.GridHelper
+	private readonly plane: THREE.Mesh
 	private mousePosition: THREE.Vector2
 	public mode: Mode
 	private selectedObject: THREE.Mesh | null
-	private axisHelper: THREE.AxesHelper
-	private axisHelperId: number
 	private controlPoints: THREE.Mesh[]
-	private plane: THREE.Mesh
-	private planeId: number
 	private offset: THREE.Vector3
 	private intersects: THREE.Intersection[]
+	private selectedObjectColor: number
+	private highlightColor: number
 
 	constructor() {
 		this.scene = new THREE.Scene()
@@ -28,26 +35,26 @@ export class ThreeScene {
 			0.1,
 			1000
 		)
-		this.light = new THREE.DirectionalLight(0xffffff, 2)
-		this.renderer = new THREE.WebGLRenderer()
+		this.mainLight = new THREE.DirectionalLight(0xffffff, 5)
+		this.ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+		this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
 		this.renderer.setSize(window.innerWidth, window.innerHeight)
 		this.raycaster = new THREE.Raycaster()
 		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
 		this.mousePosition = new THREE.Vector2()
 		this.mode = Mode.Draw
 		this.selectedObject = null
+		this.selectedObjectColor = 0x00ff00
+		this.highlightColor = 0x89cff3
 		this.axisHelper = new THREE.AxesHelper(20)
+		this.gridHelper = new THREE.GridHelper(50, 10, 0x0000ff, 0x808080)
 		this.controls.update()
-		this.camera.position.set(2, 3, 20)
-		this.plane = this.addHorizontalPlane()
-		this.planeId = this.plane.id
-		this.axisHelperId = this.axisHelper.id
+		this.plane = createPlane()
+		this.plane.add(this.gridHelper)
 		this.controlPoints = []
 		this.offset = new THREE.Vector3()
 		this.intersects = []
-		this.setupCamera()
-		this.addObjectsToScene(this.axisHelper, this.camera, this.light, this.plane)
-		this.setAnimationLoopForRenderer()
+		this.sceneSetup()
 	}
 
 	setAnimationLoopForRenderer() {
@@ -56,25 +63,36 @@ export class ThreeScene {
 		})
 	}
 
-	setupCamera() {
+	sceneSetup() {
 		this.camera.rotateY(Math.PI / 4)
 		this.camera.rotateX(-Math.PI / 4)
-		this.camera.position.set(20, 15, 20)
+		this.camera.position.set(20, 20, 20)
+		this.mainLight.position.set(20, 20, 20)
+		this.gridHelper.rotateX(-Math.PI / 2)
+		this.controls.minPolarAngle = THREE.MathUtils.degToRad(45)
+		this.controls.maxPolarAngle = THREE.MathUtils.degToRad(75)
+		this.controls.minDistance = 20
+		this.controls.maxDistance = 40
+		this.controls.enableDamping = true
+		this.addObjectsToScene(
+			this.axisHelper,
+			this.camera,
+			this.mainLight,
+			this.plane,
+			this.ambientLight
+		)
+		this.controls.addEventListener("change", () => {
+			this.mainLight.position.copy(this.camera.position)
+		})
+		this.renderer.setClearColor(0x000000, 0)
+		this.setAnimationLoopForRenderer()
+		this.axisHelper.userData.objectType = ObjectType.Fixed
+		this.gridHelper.userData.objectType = ObjectType.Fixed
+		this.plane.userData.objectType = ObjectType.Fixed
 	}
 
 	addObjectsToScene(...objects: THREE.Object3D[]) {
 		this.scene.add(...objects)
-	}
-
-	addHorizontalPlane() {
-		const geometry = new THREE.PlaneGeometry(50, 50)
-		const material = new THREE.MeshBasicMaterial({
-			color: 0xffffff,
-			side: THREE.DoubleSide,
-		})
-		const plane = new THREE.Mesh(geometry, material)
-		plane.rotation.x = Math.PI / 2
-		return plane
 	}
 
 	updateMode(mode: Mode) {
@@ -86,12 +104,7 @@ export class ThreeScene {
 
 	extrudeSelectedShape(height: number) {
 		if (this.selectedObject) {
-			if (
-				this.selectedObject.id === this.plane.id ||
-				this.selectedObject.id === this.axisHelper.id
-			) {
-				return
-			}
+			if (this.selectedObject.userData.objectType === ObjectType.Fixed) return
 			this.selectedObject.scale.y = height
 		}
 	}
@@ -114,17 +127,11 @@ export class ThreeScene {
 	}
 
 	updatePolygonOnVertexEdit() {
-		if (this.selectedObject?.userData.name === "controlPoint") {
+		if (this.selectedObject?.userData.objectType === ObjectType.ControlPoint) {
 			let polygon = this.selectedObject.parent
 			this.scene.remove(this.selectedObject)
 			this.scene.remove(polygon as THREE.Mesh)
-			const cp = new THREE.Mesh(
-				new THREE.SphereGeometry(0.125, 80, 80),
-				new THREE.MeshBasicMaterial({ color: "red" })
-			)
-			cp.position.copy(this.intersects[0].point)
-			cp.position.y = 0
-			//
+			const cp = addControlPoint(this.intersects[0].point)
 			const indexOfEditingVertex = polygon?.userData.controlPoints.findIndex(
 				(cp: THREE.Mesh) => cp.id === this.selectedObject?.id
 			)
@@ -138,16 +145,18 @@ export class ThreeScene {
 					}
 				)
 			}
-			cp.userData.name = "controlPoint"
 			const cps = this.selectedObject.parent?.userData.controlPoints
 			if (cps) {
-				this.createExtrudedPolygon(cps)
+				const polygon = createExtrudedPolygon(cps)
+				this.controlPoints = []
+				this.scene.add(polygon)
 			}
 		}
 	}
 
 	onPointerUp(e: MouseEvent) {
-		if (this.mode === Mode.Move || this.mode === Mode.Draw) {
+		this.undoHighlightSelectedObject()
+		if (this.mode == Mode.Move || this.mode === Mode.Draw) {
 			this.selectedObject = null
 		} else if (this.mode === Mode.EditVertex) {
 			this.updatePolygonOnVertexEdit()
@@ -155,41 +164,12 @@ export class ThreeScene {
 		this.controls.enabled = true
 	}
 
-	createExtrudedPolygon(controlPoints: THREE.Mesh[]) {
-		const cps = controlPoints.map((cp) => {
-			return new THREE.Vector2(cp.position.x, -1 * cp.position.z)
-		})
-		const shape = new THREE.Shape(cps)
-		const extrudeSettings = {
-			steps: 20,
-			depth: 1,
-			amount: 5,
-			bevelEnabled: false,
-		}
-		const extrudeGeom = new THREE.ExtrudeGeometry(shape, extrudeSettings)
-		extrudeGeom.rotateX(-Math.PI / 2)
-		const polygon = new THREE.Mesh(
-			extrudeGeom,
-			new THREE.MeshPhongMaterial({ color: 0x00ff00 })
-		)
-		for (let i = 0; i < controlPoints.length; i++) {
-			polygon.add(controlPoints[i])
-		}
-		polygon.userData.controlPoints = controlPoints
-		polygon.userData.extrudeSettings = extrudeSettings
-		this.controlPoints = []
-		this.scene.add(polygon)
-	}
-
 	shiftSelectedObjectCondition() {
+		const selectedObjectType = this.selectedObject?.userData.objectType
 		return (
-			this.selectedObject &&
-			this.selectedObject.id !== this.planeId &&
-			this.selectedObject.id !== this.axisHelperId &&
-			((this.selectedObject.userData.name !== "controlPoint" &&
-				this.mode === Mode.Move) ||
-				(this.mode === Mode.EditVertex &&
-					this.selectedObject.userData.name === "controlPoint"))
+			(this.mode === Mode.Move && selectedObjectType === ObjectType.Polygon) ||
+			(this.mode === Mode.EditVertex &&
+				selectedObjectType === ObjectType.ControlPoint)
 		)
 	}
 
@@ -199,17 +179,26 @@ export class ThreeScene {
 		this.renderer.setSize(window.innerWidth, window.innerHeight)
 	}
 
-	addControlPoints() {
-		if (this.intersects[0].object.id === this.planeId) {
-			var cp = new THREE.Mesh(
-				new THREE.SphereGeometry(0.125, 80, 80),
-				new THREE.MeshBasicMaterial({ color: "red" })
-			)
-			cp.position.copy(this.intersects[0].point)
-			cp.position.y = 0
-			cp.userData.name = "controlPoint"
-			this.controlPoints.push(cp)
-			this.scene.add(cp)
+	highlightSelectedObject() {
+		if (this.mode === Mode.Move || this.mode === Mode.Extrude) {
+			if (this.selectedObject?.userData.objectType !== ObjectType.Fixed) {
+				this.selectedObjectColor = (
+					this.selectedObject?.material as THREE.MeshBasicMaterial
+				).color.getHex()
+				;(
+					this.selectedObject?.material as THREE.MeshBasicMaterial
+				).color.setHex(this.highlightColor)
+			}
+		}
+	}
+
+	undoHighlightSelectedObject() {
+		if (this.mode === Mode.Move || this.mode === Mode.Extrude) {
+			if (this.selectedObject?.userData.objectType !== ObjectType.Fixed) {
+				;(
+					this.selectedObject?.material as THREE.MeshBasicMaterial
+				).color.setHex(this.selectedObjectColor)
+			}
 		}
 	}
 
@@ -219,17 +208,27 @@ export class ThreeScene {
 		}
 		this.selectedObject = this.intersects[0].object as THREE.Mesh
 		if (event.buttons === 1) {
-			if (this.mode === Mode.Draw) {
-				this.addControlPoints()
+			if (
+				this.mode === Mode.Draw &&
+				this.intersects[0].object.userData.objectType === ObjectType.Fixed
+			) {
+				const cp = addControlPoint(this.intersects[0].point)
+				if (cp) {
+					this.controlPoints.push(cp)
+					this.scene.add(cp)
+				}
 			} else if (this.shiftSelectedObjectCondition()) {
 				this.offset.copy(
 					this.intersects[0].point.sub(this.selectedObject.position)
 				)
 				this.offset.y = 0
+				this.highlightSelectedObject()
 			}
 		} else if (event.buttons === 2) {
 			if (this.mode === Mode.Draw && this.controlPoints.length > 2) {
-				this.createExtrudedPolygon(this.controlPoints)
+				const polygon = createExtrudedPolygon(this.controlPoints)
+				this.controlPoints = []
+				this.scene.add(polygon)
 			}
 		}
 	}
