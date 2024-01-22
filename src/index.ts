@@ -22,7 +22,7 @@ interface IEnumMode {
 const editMode: IEnumMode = {
 	Draw: Mode.Draw,
 	Move: Mode.Move,
-	["Edit Verted"]: Mode.EditVertex,
+	["Edit Vertex"]: Mode.EditVertex,
 	Extrude: Mode.Extrude,
 }
 const threeScene = new ThreeScene()
