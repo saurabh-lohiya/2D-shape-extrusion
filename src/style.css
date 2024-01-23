@@ -31,7 +31,7 @@ body {
   min-height: 100vh;
   overflow: hidden;
   margin: 0;
-  background: linear-gradient( 180deg, rgba(156,252,248,1) 11.2%, rgba(110,123,251,1) 91.1% );
+  background: linear-gradient( 180deg, #005aa7, #fffde4 91.1% );
 }
 
 h1 {

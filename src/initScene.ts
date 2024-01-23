@@ -16,7 +16,6 @@ export class ThreeScene {
 	private readonly raycaster: THREE.Raycaster
 	private readonly controls: OrbitControls
 	private readonly axisHelper: THREE.AxesHelper
-	private readonly gridHelper: THREE.GridHelper
 	private readonly plane: THREE.Mesh
 	private mousePosition: THREE.Vector2
 	public mode: Mode
@@ -47,10 +46,8 @@ export class ThreeScene {
 		this.selectedObjectColor = 0x00ff00
 		this.highlightColor = 0x89cff3
 		this.axisHelper = new THREE.AxesHelper(20)
-		this.gridHelper = new THREE.GridHelper(50, 10, 0x0000ff, 0x808080)
 		this.controls.update()
 		this.plane = createPlane()
-		this.plane.add(this.gridHelper)
 		this.controlPoints = []
 		this.offset = new THREE.Vector3()
 		this.intersects = []
@@ -68,7 +65,6 @@ export class ThreeScene {
 		this.camera.rotateX(-Math.PI / 4)
 		this.camera.position.set(20, 20, 20)
 		this.mainLight.position.set(20, 20, 20)
-		this.gridHelper.rotateX(-Math.PI / 2)
 		this.controls.minPolarAngle = THREE.MathUtils.degToRad(45)
 		this.controls.maxPolarAngle = THREE.MathUtils.degToRad(75)
 		this.controls.minDistance = 20
@@ -87,7 +83,6 @@ export class ThreeScene {
 		this.renderer.setClearColor(0x000000, 0)
 		this.setAnimationLoopForRenderer()
 		this.axisHelper.userData.objectType = ObjectType.Fixed
-		this.gridHelper.userData.objectType = ObjectType.Fixed
 		this.plane.userData.objectType = ObjectType.Fixed
 	}
 
@@ -132,13 +127,10 @@ export class ThreeScene {
 			this.scene.remove(this.selectedObject)
 			this.scene.remove(polygon as THREE.Mesh)
 			const cp = addControlPoint(this.intersects[0].point)
-			const indexOfEditingVertex = polygon?.userData.controlPoints.findIndex(
-				(cp: THREE.Mesh) => cp.id === this.selectedObject?.id
-			)
 			if (polygon) {
 				polygon.userData.controlPoints = polygon.userData.controlPoints.map(
-					(temp_cp: THREE.Mesh, index: number) => {
-						if (index === indexOfEditingVertex) {
+					(temp_cp: THREE.Mesh) => {
+						if (temp_cp.id === this.selectedObject?.id) {
 							return cp
 						}
 						return temp_cp
@@ -222,6 +214,8 @@ export class ThreeScene {
 					this.intersects[0].point.sub(this.selectedObject.position)
 				)
 				this.offset.y = 0
+			}
+			if (this.mode === Mode.Move || this.mode === Mode.Extrude) {
 				this.highlightSelectedObject()
 			}
 		} else if (event.buttons === 2) {

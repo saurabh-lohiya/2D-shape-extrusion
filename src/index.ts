@@ -6,7 +6,9 @@ const threeScene = new ThreeScene()
 
 const gui = new dat.GUI()
 let modeController = gui.add(threeScene, "mode", Object.keys(editMode))
-modeController.setValue(Mode.Draw).updateDisplay()
+modeController.setValue(Mode.Draw)
+gui.updateDisplay()
+
 modeController.onChange((value) => {
 	threeScene.updateMode(editMode[value])
 })

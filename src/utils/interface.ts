@@ -14,9 +14,11 @@ export interface IPolygon {
 export interface IPolygonCords {
 	[key: string]: number
 }
+
 interface IEnumMode {
 	[key: string]: Mode
 }
+
 export const editMode: IEnumMode = {
 	Draw: Mode.Draw,
 	Move: Mode.Move,

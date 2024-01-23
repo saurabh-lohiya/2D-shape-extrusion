@@ -14,7 +14,6 @@ export function createExtrudedPolygon(controlPoints: THREE.Mesh[]) {
 	}
 	const extrudeGeom = new THREE.ExtrudeGeometry(shape, extrudeSettings)
 	extrudeGeom.rotateX(-Math.PI / 2)
-	// Create golf field like material
 	const polygon = new THREE.Mesh(
 		extrudeGeom,
 		new THREE.MeshStandardMaterial({
