@@ -1,32 +1,33 @@
-import { ObjectType } from "./../utils/interface"
 import * as THREE from "three"
+import { ObjectType } from "../utils/interface"
 
 export function createExtrudedPolygon(controlPoints: THREE.Mesh[]) {
-	const cps = controlPoints.map((cp) => {
-		return new THREE.Vector2(cp.position.x, -1 * cp.position.z)
+	const geometry = new THREE.BufferGeometry()
+	const vertices: any = []
+	const indices: any = []
+
+	controlPoints.forEach((cp, i) => {
+		vertices.push(cp.position.x, cp.position.y, cp.position.z)
+		indices.push(i)
 	})
-	const shape = new THREE.Shape(cps)
-	const extrudeSettings = {
-		steps: 20,
-		depth: 1,
-		amount: 5,
-		bevelEnabled: false,
+
+	const cpVertices = new Float32Array(vertices)
+	geometry.setAttribute("position", new THREE.BufferAttribute(cpVertices, 3))
+
+	const faces = []
+	for (let i = 1; i < controlPoints.length - 1; i++) {
+		faces.push(0, i, i + 1)
 	}
-	const extrudeGeom = new THREE.ExtrudeGeometry(shape, extrudeSettings)
-	extrudeGeom.rotateX(-Math.PI / 2)
-	const polygon = new THREE.Mesh(
-		extrudeGeom,
-		new THREE.MeshStandardMaterial({
-			color: 0x00a9ff,
-			wireframe: false,
-			side: THREE.DoubleSide,
-		})
-	)
-	for (let i = 0; i < controlPoints.length; i++) {
-		polygon.add(controlPoints[i])
-	}
+	geometry.setIndex(faces)
+
+	const material = new THREE.MeshStandardMaterial({
+		color: 0x00ff00,
+		side: THREE.DoubleSide,
+	})
+
+	const polygon = new THREE.Mesh(geometry, material)
+	polygon.add(...controlPoints)
 	polygon.userData.controlPoints = controlPoints
-	polygon.userData.extrudeSettings = extrudeSettings
 	polygon.userData.objectType = ObjectType.Polygon
 	return polygon
 }

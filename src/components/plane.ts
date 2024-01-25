@@ -15,6 +15,5 @@ export function createPlane(
 	})
 	const plane = new THREE.Mesh(geometry, material)
 	plane.rotation.set(rotation.x, rotation.y, rotation.z)
-	// plane.position.y = 0
 	return plane
 }

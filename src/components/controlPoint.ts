@@ -8,6 +8,5 @@ export function addControlPoint(position: THREE.Vector3) {
 	)
 	cp.position.copy(position)
 	cp.userData.objectType = ObjectType.ControlPoint
-	cp.position.y = 0
 	return cp
 }
