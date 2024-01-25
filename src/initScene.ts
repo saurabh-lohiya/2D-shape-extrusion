@@ -16,7 +16,9 @@ export class ThreeScene {
 	private readonly raycaster: THREE.Raycaster
 	private readonly controls: OrbitControls
 	private readonly axisHelper: THREE.AxesHelper
-	private readonly plane: THREE.Mesh
+	private readonly XZplane: THREE.Mesh
+	private readonly YZplane: THREE.Mesh
+	private readonly XYplane: THREE.Mesh
 	private mousePosition: THREE.Vector2
 	public mode: Mode
 	private selectedObject: THREE.Mesh | null
@@ -24,6 +26,8 @@ export class ThreeScene {
 	private offset: THREE.Vector3
 	private intersects: THREE.Intersection[]
 	private selectedObjectColor: number
+	private SOP: THREE.Vector3 | null
+	private SOPC: THREE.Vector3 | null
 	private highlightColor: number
 
 	constructor() {
@@ -44,10 +48,26 @@ export class ThreeScene {
 		this.mode = Mode.Draw
 		this.selectedObject = null
 		this.selectedObjectColor = 0x00ff00
+		this.SOP = null
+		this.SOPC = null
 		this.highlightColor = 0x89cff3
-		this.axisHelper = new THREE.AxesHelper(20)
+		this.axisHelper = new THREE.AxesHelper(100)
 		this.controls.update()
-		this.plane = createPlane()
+		this.XYplane = createPlane(0xffffaa, true, 0.1, new THREE.Vector3(0, 0, 0))
+		this.YZplane = createPlane(
+			0xffffff,
+			true,
+			0.1,
+			new THREE.Vector3(0, Math.PI / 2, 0)
+		)
+		this.XZplane = createPlane(
+			0xffffff,
+			true,
+			1,
+			new THREE.Vector3(Math.PI / 2, 0, 0)
+		)
+		this.XYplane.visible = false
+		this.YZplane.visible = false
 		this.controlPoints = []
 		this.offset = new THREE.Vector3()
 		this.intersects = []
@@ -74,7 +94,9 @@ export class ThreeScene {
 			this.axisHelper,
 			this.camera,
 			this.mainLight,
-			this.plane,
+			this.XYplane,
+			this.YZplane,
+			this.XZplane,
 			this.ambientLight
 		)
 		this.controls.addEventListener("change", () => {
@@ -83,7 +105,9 @@ export class ThreeScene {
 		this.renderer.setClearColor(0x000000, 0)
 		this.setAnimationLoopForRenderer()
 		this.axisHelper.userData.objectType = ObjectType.Fixed
-		this.plane.userData.objectType = ObjectType.Fixed
+		this.XZplane.userData.objectType = ObjectType.Fixed
+		this.XYplane.userData.objectType = ObjectType.Fixed
+		this.YZplane.userData.objectType = ObjectType.Fixed
 	}
 
 	addObjectsToScene(...objects: THREE.Object3D[]) {
@@ -112,11 +136,21 @@ export class ThreeScene {
 		this.intersects = this.raycaster.intersectObjects(this.scene.children)
 		if (this.shiftSelectedObjectCondition()) {
 			this.controls.enabled = false
-			if (this.selectedObject) {
-				this.selectedObject.position.copy(
-					this.intersects[0].point.sub(this.offset)
-				)
-				this.selectedObject.position.y = 0
+			this.SOPC = this.intersects[0].point.sub(this.offset)
+		}
+	}
+
+	moveObjectsInThreeD(e: KeyboardEvent) {
+		if (this.selectedObject) {
+			console.log(this.SOP)
+			if (this.SOP && this.SOPC) {
+				if (e.key === "y") {
+					this.selectedObject.position.set(this.SOPC.x, this.SOP.y, this.SOPC.z)
+				} else if (e.key === "x") {
+					this.selectedObject.position.set(this.SOP.x, this.SOPC.y, this.SOPC.z)
+				} else if (e.key === "z") {
+					this.selectedObject.position.set(this.SOPC.x, this.SOPC.y, this.SOP.z)
+				}
 			}
 		}
 	}
@@ -213,7 +247,7 @@ export class ThreeScene {
 				this.offset.copy(
 					this.intersects[0].point.sub(this.selectedObject.position)
 				)
-				this.offset.y = 0
+				this.SOP = this.selectedObject.position.clone()
 			}
 			if (this.mode === Mode.Move || this.mode === Mode.Extrude) {
 				this.highlightSelectedObject()

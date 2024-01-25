@@ -26,11 +26,15 @@ extrudeFolder
 	})
 
 document.body.appendChild(threeScene.renderer.domElement)
+
 window.addEventListener("pointermove", (e) => {
 	threeScene.onPointerMove(e)
 })
 window.addEventListener("mousedown", threeScene.onPointerDown.bind(threeScene))
 window.addEventListener("pointerup", threeScene.onPointerUp.bind(threeScene))
+window.addEventListener("keypress", (e) => {
+	threeScene.moveObjectsInThreeD(e)
+})
 window.addEventListener(
 	"resize",
 	threeScene.updateOnWindowResize.bind(threeScene)
