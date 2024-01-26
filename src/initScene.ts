@@ -6,71 +6,91 @@ import {
 	createExtrudedPolygon,
 	createPlane,
 } from "./components"
+import { getPolygonFaces, getPolygonVertices } from "./utils/getPolygonFaces"
+import {
+	Scene,
+	PerspectiveCamera,
+	DirectionalLight,
+	AmbientLight,
+	WebGLRenderer,
+	Raycaster,
+	Vector2,
+	Object3D,
+	AxesHelper,
+	MathUtils,
+	Mesh,
+	MeshBasicMaterial,
+	Intersection,
+	Vector3,
+} from "three"
 
 export class ThreeScene {
-	private readonly scene: THREE.Scene
-	private readonly camera: THREE.PerspectiveCamera
-	private readonly mainLight: THREE.DirectionalLight
-	private readonly ambientLight: THREE.AmbientLight
-	public readonly renderer: THREE.WebGLRenderer
-	private readonly raycaster: THREE.Raycaster
+	private readonly scene: Scene
+	private readonly camera: PerspectiveCamera
+	private readonly mainLight: DirectionalLight
+	private readonly ambientLight: AmbientLight
+	public readonly renderer: WebGLRenderer
+	private readonly raycaster: Raycaster
 	private readonly controls: OrbitControls
-	private readonly axisHelper: THREE.AxesHelper
-	private readonly XZplane: THREE.Mesh
-	private readonly YZplane: THREE.Mesh
-	private readonly XYplane: THREE.Mesh
-	private mousePosition: THREE.Vector2
+	private readonly axisHelper: AxesHelper
+	private readonly XZplane: Mesh
+	private readonly YZplane: Mesh
+	private readonly XYplane: Mesh
+	private mousePosition: Vector2
 	public mode: Mode
-	private selectedObject: THREE.Mesh | null
-	private controlPoints: THREE.Mesh[]
-	private offset: THREE.Vector3
-	private intersects: THREE.Intersection[]
+	private selectedObject: Mesh | null
+	private controlPoints: Mesh[]
+	private offset: Vector3
+	private intersects: Intersection[]
 	private selectedObjectColor: number
-	private SOP: THREE.Vector3 | null
-	private SOPC: THREE.Vector3 | null
+	private SOP: Vector3 | null
+	private SOPC: Vector3 | null
 	private highlightColor: number
+	public extrudeSelectedPolygon: boolean
 
 	constructor() {
-		this.scene = new THREE.Scene()
-		this.camera = new THREE.PerspectiveCamera(
+		this.scene = new Scene()
+		this.camera = new PerspectiveCamera(
 			75,
 			window.innerWidth / window.innerHeight,
 			0.1,
 			1000
 		)
-		this.mainLight = new THREE.DirectionalLight(0xffffff, 5)
-		this.ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
-		this.renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true })
+		this.mainLight = new DirectionalLight(0xffffff, 5)
+		this.ambientLight = new AmbientLight(0xffffff, 0.5)
+		this.renderer = new WebGLRenderer({ alpha: true, antialias: true })
 		this.renderer.setSize(window.innerWidth, window.innerHeight)
-		this.raycaster = new THREE.Raycaster()
+		this.raycaster = new Raycaster()
 		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
-		this.mousePosition = new THREE.Vector2()
+		this.mousePosition = new Vector2()
 		this.mode = Mode.Draw
 		this.selectedObject = null
 		this.selectedObjectColor = 0x00ff00
 		this.SOP = null
 		this.SOPC = null
 		this.highlightColor = 0x89cff3
-		this.axisHelper = new THREE.AxesHelper(100)
+		this.axisHelper = new AxesHelper(100)
 		this.controls.update()
-		this.XYplane = createPlane(0xffffaa, true, 0.1, new THREE.Vector3(0, 0, 0))
+		this.XYplane = createPlane(0xffffaa, true, 0.1, new Vector3(0, 0, 0))
 		this.YZplane = createPlane(
 			0xffffff,
 			true,
 			0.1,
-			new THREE.Vector3(0, Math.PI / 2, 0)
+			new Vector3(0, Math.PI / 2, 0)
 		)
 		this.XZplane = createPlane(
 			0xffffff,
 			true,
 			1,
-			new THREE.Vector3(Math.PI / 2, 0, 0)
+			new Vector3(Math.PI / 2, 0, 0)
 		)
+		// this.XYplane.position.y = -0.5
 		this.XYplane.visible = false
 		this.YZplane.visible = false
 		this.controlPoints = []
-		this.offset = new THREE.Vector3()
+		this.offset = new Vector3()
 		this.intersects = []
+		this.extrudeSelectedPolygon = false
 		this.sceneSetup()
 	}
 
@@ -85,8 +105,8 @@ export class ThreeScene {
 		this.camera.rotateX(-Math.PI / 4)
 		this.camera.position.set(20, 20, 20)
 		this.mainLight.position.set(20, 20, 20)
-		this.controls.minPolarAngle = THREE.MathUtils.degToRad(45)
-		this.controls.maxPolarAngle = THREE.MathUtils.degToRad(75)
+		this.controls.minPolarAngle = MathUtils.degToRad(45)
+		this.controls.maxPolarAngle = MathUtils.degToRad(75)
 		this.controls.minDistance = 20
 		this.controls.maxDistance = 40
 		this.controls.enableDamping = true
@@ -110,7 +130,7 @@ export class ThreeScene {
 		this.YZplane.userData.objectType = ObjectType.Fixed
 	}
 
-	addObjectsToScene(...objects: THREE.Object3D[]) {
+	addObjectsToScene(...objects: Object3D[]) {
 		this.scene.add(...objects)
 	}
 
@@ -122,10 +142,38 @@ export class ThreeScene {
 	}
 
 	extrudeSelectedShape(height: number) {
-		if (this.selectedObject) {
-			if (this.selectedObject.userData.objectType === ObjectType.Fixed) return
-			this.selectedObject.scale.y = height
+		const SO = this.intersects.find((intersect) => {
+			return intersect.object.userData.objectType === ObjectType.Polygon
+		})
+		const cps: Mesh[] = (SO?.object.children || []).map((obj) => obj as Mesh)
+		const newControlPoints = cps.map((cp) => {
+			const newCP = cp.clone()
+			newCP.position.set(newCP.position.x, height, newCP.position.z)
+			return newCP
+		})
+		const ucps = cps.concat(newControlPoints)
+		const polygonVertices = getPolygonVertices(ucps)
+		const topFaces = []
+		const sideFaces = []
+		const n = cps.length
+		for (let i = n + 1; i < 2 * cps.length - 1; i++) {
+			topFaces.push(n, i, i + 1)
 		}
+		for (let i = 0; i < n; i++) {
+			sideFaces.push(i, i + n, n + ((i + 1) % n))
+			sideFaces.push(i, (i + 1) % n, n + ((i + 1) % n))
+		}
+		const polygon = createExtrudedPolygon(
+			ucps,
+			polygonVertices,
+			sideFaces.concat(topFaces)
+		)
+		if (SO?.object) {
+			this.scene.remove(SO.object)
+			polygon.add(SO.object)
+		}
+		polygon.userData.objectType = ObjectType.ExtrudedPolygon
+		this.scene.add(polygon)
 	}
 
 	// Implement drag and drop functionality on mouse drag for selected object
@@ -134,7 +182,12 @@ export class ThreeScene {
 		this.mousePosition.y = -(e.clientY / window.innerHeight) * 2 + 1
 		this.raycaster.setFromCamera(this.mousePosition, this.camera)
 		this.intersects = this.raycaster.intersectObjects(this.scene.children)
-		if (this.shiftSelectedObjectCondition()) {
+		const SOT = this.selectedObject?.userData.objectType
+		if (
+			(this.mode === Mode.Move &&
+				(SOT === ObjectType.Polygon || SOT === ObjectType.ExtrudedPolygon)) ||
+			(this.mode === Mode.EditVertex && SOT === ObjectType.ControlPoint)
+		) {
 			this.controls.enabled = false
 			this.SOPC = this.intersects[0].point.sub(this.offset)
 		}
@@ -158,45 +211,31 @@ export class ThreeScene {
 	updatePolygonOnVertexEdit() {
 		if (this.selectedObject?.userData.objectType === ObjectType.ControlPoint) {
 			let polygon = this.selectedObject.parent
-			this.scene.remove(this.selectedObject)
-			this.scene.remove(polygon as THREE.Mesh)
-			const cp = addControlPoint(this.intersects[0].point)
-			if (polygon) {
-				polygon.userData.controlPoints = polygon.userData.controlPoints.map(
-					(temp_cp: THREE.Mesh) => {
-						if (temp_cp.id === this.selectedObject?.id) {
-							return cp
-						}
-						return temp_cp
+
+			polygon.userData.controlPoints = polygon.userData.controlPoints.map(
+				(temp_cp: Mesh) => {
+					if (temp_cp.id === this.selectedObject?.id) {
+						return cp
 					}
-				)
-			}
-			const cps = this.selectedObject.parent?.userData.controlPoints
-			if (cps) {
-				const polygon = createExtrudedPolygon(cps)
-				this.controlPoints = []
-				this.scene.add(polygon)
-			}
+					return temp_cp
+				}
+			)
 		}
 	}
 
 	onPointerUp(e: MouseEvent) {
 		this.undoHighlightSelectedObject()
-		if (this.mode == Mode.Move || this.mode === Mode.Draw) {
+		if (
+			this.mode == Mode.Move ||
+			this.mode === Mode.Draw ||
+			this.mode === Mode.EditVertex
+		) {
 			this.selectedObject = null
-		} else if (this.mode === Mode.EditVertex) {
+		}
+		if (this.mode === Mode.EditVertex) {
 			this.updatePolygonOnVertexEdit()
 		}
 		this.controls.enabled = true
-	}
-
-	shiftSelectedObjectCondition() {
-		const selectedObjectType = this.selectedObject?.userData.objectType
-		return (
-			(this.mode === Mode.Move && selectedObjectType === ObjectType.Polygon) ||
-			(this.mode === Mode.EditVertex &&
-				selectedObjectType === ObjectType.ControlPoint)
-		)
 	}
 
 	updateOnWindowResize() {
@@ -206,25 +245,21 @@ export class ThreeScene {
 	}
 
 	highlightSelectedObject() {
-		if (this.mode === Mode.Move || this.mode === Mode.Extrude) {
-			if (this.selectedObject?.userData.objectType !== ObjectType.Fixed) {
-				this.selectedObjectColor = (
-					this.selectedObject?.material as THREE.MeshBasicMaterial
-				).color.getHex()
-				;(
-					this.selectedObject?.material as THREE.MeshBasicMaterial
-				).color.setHex(this.highlightColor)
-			}
+		if (this.selectedObject?.userData.objectType !== ObjectType.Fixed) {
+			this.selectedObjectColor = (
+				this.selectedObject?.material as MeshBasicMaterial
+			)?.color.getHex()
+			;(this.selectedObject?.material as MeshBasicMaterial)?.color.setHex(
+				this.highlightColor
+			)
 		}
 	}
 
 	undoHighlightSelectedObject() {
-		if (this.mode === Mode.Move || this.mode === Mode.Extrude) {
-			if (this.selectedObject?.userData.objectType !== ObjectType.Fixed) {
-				;(
-					this.selectedObject?.material as THREE.MeshBasicMaterial
-				).color.setHex(this.selectedObjectColor)
-			}
+		if (this.selectedObject?.userData.objectType !== ObjectType.Fixed) {
+			;(this.selectedObject?.material as MeshBasicMaterial)?.color.setHex(
+				this.selectedObjectColor
+			)
 		}
 	}
 
@@ -232,7 +267,7 @@ export class ThreeScene {
 		if (this.intersects.length === 0) {
 			return
 		}
-		this.selectedObject = this.intersects[0].object as THREE.Mesh
+		this.selectedObject = this.intersects[0].object as Mesh
 		if (event.buttons === 1) {
 			if (
 				this.mode === Mode.Draw &&
@@ -243,19 +278,35 @@ export class ThreeScene {
 					this.controlPoints.push(cp)
 					this.scene.add(cp)
 				}
-			} else if (this.shiftSelectedObjectCondition()) {
-				this.offset.copy(
-					this.intersects[0].point.sub(this.selectedObject.position)
-				)
-				this.SOP = this.selectedObject.position.clone()
-			}
-			if (this.mode === Mode.Move || this.mode === Mode.Extrude) {
+			} else if (
+				this.mode === Mode.Move ||
+				this.mode === Mode.Extrude ||
+				this.mode === Mode.EditVertex
+			) {
 				this.highlightSelectedObject()
+				if (this.mode === Mode.EditVertex || this.mode === Mode.Move) {
+					this.SOP = this.selectedObject.position.clone()
+					this.offset.copy(
+						this.intersects[0].point.sub(this.selectedObject.position)
+					)
+				}
+				const SO = this.intersects.find((intersect) => {
+					return intersect.object.userData.objectType === ObjectType.Polygon
+				})
+				console.log(SO)
+				if (this.mode === Mode.Extrude && SO) {
+					this.extrudeSelectedShape(5)
+				}
 			}
 		} else if (event.buttons === 2) {
 			if (this.mode === Mode.Draw && this.controlPoints.length > 2) {
-				const polygon = createExtrudedPolygon(this.controlPoints)
-				this.controlPoints = []
+				const polygonVertices = getPolygonVertices(this.controlPoints)
+				const polygonFaces = getPolygonFaces(this.controlPoints)
+				const polygon = createExtrudedPolygon(
+					this.controlPoints,
+					polygonVertices,
+					polygonFaces
+				)
 				this.scene.add(polygon)
 			}
 		}

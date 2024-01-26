@@ -8,22 +8,12 @@ const gui = new dat.GUI()
 let modeController = gui.add(threeScene, "mode", Object.keys(editMode))
 modeController.setValue(Mode.Draw)
 gui.updateDisplay()
+gui.domElement.style.opacity = "1"
+gui.add(threeScene, "extrudeSelectedPolygon", false)
 
 modeController.onChange((value) => {
 	threeScene.updateMode(editMode[value])
 })
-
-const extrudeFolder = gui.addFolder("Extrude")
-const extrudeOptions = {
-	extrusionHeight: 5,
-}
-
-extrudeFolder
-	.add(extrudeOptions, "extrusionHeight", 0.5, 5)
-	.onChange((value) => {
-		// Update the extrusion height of the selected object
-		threeScene.extrudeSelectedShape(value)
-	})
 
 document.body.appendChild(threeScene.renderer.domElement)
 

@@ -27,7 +27,8 @@ export const editMode: IEnumMode = {
 }
 
 export enum ObjectType {
-    ControlPoint = "controlPoint",
-    Fixed = "fixed",
-    Polygon = "polygon",
+	ControlPoint = "controlPoint",
+	Fixed = "fixed",
+	Polygon = "polygon",
+	ExtrudedPolygon = "extrudedPolygon",
 }
