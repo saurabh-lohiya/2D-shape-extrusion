@@ -34,4 +34,5 @@ Contributions are welcome! Please submit a Pull Request against the dev branch.
 Naming Convention
 
 If it's a feature `feature/<feature-name>`
-If it's a bug naming conventions would be `bugfix/<feature-name>`
+
+If it's a bug `bugfix/<feature-name>`
