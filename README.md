@@ -1,7 +1,7 @@
 # 2D-shape-extrusion
 
 ## Overview
-This project focuses on creating, moving, extruding 2D shapes and Editing their Vertices through mouse events.
+This project focuses on creating, extruding and editing vertices of 2D shapes through mouse events and moving it in 3D space.
 
 ## Setup
 To install dependencies, `run npm install`.
