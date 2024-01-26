@@ -9,7 +9,7 @@ let modeController = gui.add(threeScene, "mode", Object.keys(editMode))
 modeController.setValue(Mode.Draw)
 gui.updateDisplay()
 gui.domElement.style.opacity = "1"
-gui.add(threeScene, "extrudeSelectedPolygon", false)
+gui.add(threeScene, "extrusionHeight", 1, 20, 1).setValue(5)
 
 modeController.onChange((value) => {
 	threeScene.updateMode(editMode[value])
