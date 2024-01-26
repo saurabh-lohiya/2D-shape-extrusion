@@ -21,6 +21,7 @@ window.addEventListener("pointermove", (e) => {
 	threeScene.onPointerMove(e)
 })
 window.addEventListener("mousedown", threeScene.onPointerDown.bind(threeScene))
+window.addEventListener("keyup", threeScene.onKeyUp.bind(threeScene))
 window.addEventListener("pointerup", threeScene.onPointerUp.bind(threeScene))
 window.addEventListener("keypress", (e) => {
 	threeScene.moveObjectsInThreeD(e)

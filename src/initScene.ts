@@ -38,15 +38,17 @@ export class ThreeScene {
 	private readonly XYplane: Mesh
 	private mousePosition: Vector2
 	public mode: Mode
-	private selectedObject: Mesh | null
 	private controlPoints: Mesh[]
 	private offset: Vector3
 	private intersects: Intersection[]
+	// SO = Selected Object
 	// SOOP = Selected Object Original Position
 	// SOCP = Selected Object Current Position
 	// MOP = Modified Object Position
 	// SOHC = Selected Object Highlight Color
 	// SOC = Selected Object Color
+	// SOT = Selected Object Type
+	private SO: Mesh | null
 	private SOC: number
 	private SOOP: Vector3 | null
 	private SOCP: Vector3 | null
@@ -70,7 +72,7 @@ export class ThreeScene {
 		this.controls = new OrbitControls(this.camera, this.renderer.domElement)
 		this.mousePosition = new Vector2()
 		this.mode = Mode.Draw
-		this.selectedObject = null
+		this.SO = null
 		this.SOC = 0x00ff00
 		this.SOOP = null
 		this.SOCP = null
@@ -147,10 +149,11 @@ export class ThreeScene {
 	}
 
 	extrudeSelectedShape(height: number) {
-		const SO = this.intersects.find((intersect) => {
+		// OP: Original Polygon
+		const OP = this.intersects.find((intersect) => {
 			return intersect.object.userData.objectType === ObjectType.Polygon
 		})
-		const cps: Mesh[] = (SO?.object.children || []).map((obj) => obj as Mesh)
+		const cps: Mesh[] = (OP?.object.children || []).map((obj) => obj as Mesh)
 		const newControlPoints = cps.map((cp) => {
 			const newCP = cp.clone()
 			newCP.position.set(
@@ -178,11 +181,20 @@ export class ThreeScene {
 		}
 		const faces = sideFaces.concat(topFaces).concat(bottomFaces)
 		const polygon = createExtrudedPolygon(ucps, polygonVertices, faces)
-		if (SO?.object) {
-			this.scene.remove(SO.object)
+		if (OP?.object) {
+			this.scene.remove(OP.object)
 		}
 		polygon.userData.objectType = ObjectType.ExtrudedPolygon
 		this.scene.add(polygon)
+	}
+
+	onKeyUp(e: KeyboardEvent) {
+		if (e.key === "x") {
+			this.scene.add(this.XYplane)
+		}
+		if (e.key === "z") {
+			this.scene.add(this.YZplane)
+		}
 	}
 
 	onPointerMove(e: MouseEvent) {
@@ -190,7 +202,7 @@ export class ThreeScene {
 		this.mousePosition.y = -(e.clientY / window.innerHeight) * 2 + 1
 		this.raycaster.setFromCamera(this.mousePosition, this.camera)
 		this.intersects = this.raycaster.intersectObjects(this.scene.children)
-		const SOT = this.selectedObject?.userData.objectType
+		const SOT = this.SO?.userData.objectType
 		if (
 			(this.mode === Mode.Move &&
 				(SOT === ObjectType.Polygon || SOT === ObjectType.ExtrudedPolygon)) ||
@@ -198,35 +210,35 @@ export class ThreeScene {
 		) {
 			this.controls.enabled = false
 			this.SOCP = this.intersects[0].point.sub(this.offset)
+			this.SOCP.y = this.SOCP.y < 0 ? 0 : this.SOCP.y
 		}
 	}
 
 	moveObjectsInThreeD(e: KeyboardEvent) {
-		if (this.selectedObject) {
+		if (this.SO) {
 			if (this.SOOP && this.SOCP) {
 				this.MOP = new Vector3(this.SOCP.x, this.SOCP.y, this.SOCP.z)
 				if (e.key === "y") {
 					this.MOP.y = this.SOOP.y
 				} else if (e.key === "x") {
+					this.scene.remove(this.XYplane)
 					this.MOP.x = this.SOOP.x
 				} else if (e.key === "z") {
+					this.scene.remove(this.YZplane)
 					this.MOP.z = this.SOOP.z
 				}
-				this.selectedObject.position.copy(this.MOP)
+				this.SO.position.copy(this.MOP)
 			}
 		}
 	}
 
 	updatePolygonOnVertexEdit() {
 		// Update the polygon on vertex edit
-		if (
-			this.selectedObject?.userData.objectType === ObjectType.ControlPoint &&
-			this.MOP
-		) {
-			const cp = this.selectedObject
+		if (this.SO?.userData.objectType === ObjectType.ControlPoint && this.MOP) {
+			const cp = this.SO
 			const polygon = cp.parent
 			const selectedCPindex = polygon?.children.findIndex(
-				(cp) => cp.uuid === this.selectedObject?.uuid
+				(cp) => cp.uuid === this.SO?.uuid
 			)
 			if (!polygon || !(polygon instanceof THREE.Mesh)) {
 				return
@@ -254,7 +266,7 @@ export class ThreeScene {
 	onPointerUp(e: MouseEvent) {
 		this.undoHighlightSelectedObject()
 		if (this.mode == Mode.Move || this.mode === Mode.Draw) {
-			this.selectedObject = null
+			this.SO = null
 		}
 		if (this.mode === Mode.EditVertex) {
 			this.updatePolygonOnVertexEdit()
@@ -272,18 +284,14 @@ export class ThreeScene {
 	}
 
 	highlightSelectedObject() {
-		if (this.selectedObject?.userData.objectType !== ObjectType.Fixed) {
-			;;(this.selectedObject?.material as MeshBasicMaterial)?.color.setHex(
-				this.SOHC
-			)
+		if (this.SO?.userData.objectType !== ObjectType.Fixed) {
+			;(this.SO?.material as MeshBasicMaterial)?.color.setHex(this.SOHC)
 		}
 	}
 
 	undoHighlightSelectedObject() {
-		if (this.selectedObject?.userData.objectType !== ObjectType.Fixed) {
-			;;(this.selectedObject?.material as MeshBasicMaterial)?.color.setHex(
-				this.SOC
-			)
+		if (this.SO?.userData.objectType !== ObjectType.Fixed) {
+			;(this.SO?.material as MeshBasicMaterial)?.color.setHex(this.SOC)
 		}
 	}
 
@@ -291,11 +299,8 @@ export class ThreeScene {
 		if (this.intersects.length === 0) {
 			return
 		}
-		this.selectedObject = this.intersects[0].object as Mesh
-
-		this.SOC = (
-			this.selectedObject?.material as MeshBasicMaterial
-		)?.color.getHex()
+		this.SO = this.intersects[0].object as Mesh
+		this.SOC = (this.SO?.material as MeshBasicMaterial)?.color.getHex()
 		if (event.buttons === 1) {
 			if (
 				this.mode === Mode.Draw &&
@@ -313,16 +318,14 @@ export class ThreeScene {
 			) {
 				this.highlightSelectedObject()
 				if (this.mode === Mode.EditVertex || this.mode === Mode.Move) {
-					this.SOOP = this.selectedObject.position.clone()
-					this.offset.copy(
-						this.intersects[0].point.sub(this.selectedObject.position)
-					)
-					this.SOCP = this.intersects[0].point.sub(this.offset)
+					this.SOOP = this.SO.position.clone()
+					this.offset.copy(this.intersects[0].point.sub(this.SO.position))
 				}
-				const SO = this.intersects.find((intersect) => {
+				// OP: Original Polygon
+				const OP = this.intersects.find((intersect) => {
 					return intersect.object.userData.objectType === ObjectType.Polygon
 				})
-				if (this.mode === Mode.Extrude && SO) {
+				if (this.mode === Mode.Extrude && OP) {
 					this.extrudeSelectedShape(this.extrusionHeight)
 				}
 			}
