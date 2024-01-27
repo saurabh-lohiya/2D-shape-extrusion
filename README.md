@@ -12,16 +12,16 @@ Execute `vite` to start the project.
 ## Guide
 You can select the mode by selecting on the dropdown on top-right side on window once you start the server.
 
-1. Draw \n
+1. Draw  
 Use Left Click to draw the vertices of polygon and right click to join them
 
-2. Extrude \n
+2. Extrude  
 Once, you've created the polygon you can extrude it by selecting the extrusion height form `gui` and clicking on it.
 
-3. Move \n
+3. Move  
 click and hold on Polygon or The Extruded Polygon You've created in the previous step to select it and press either `x`, `y`, or `z` to move it in plane perpendicular to the axis by moving the cursor.
 
-4. Edit Vertex \n
+4. Edit Vertex  
 You can edit the vertices of the Polygon or extruded by clicking on it and hold it and press either `x`, `y`, or `z` to move it in plane perpendicular to the axis by moving the cursor.
 
 ## Contributing
