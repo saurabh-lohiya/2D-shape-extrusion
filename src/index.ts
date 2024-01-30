@@ -11,11 +11,19 @@ gui.updateDisplay()
 gui.domElement.style.opacity = "1"
 gui.add(threeScene, "extrusionHeight", 1, 20, 1).setValue(5)
 
-modeController.onChange((value) => {
+modeController.onChange((value: Mode) => {
 	threeScene.updateMode(editMode[value])
 })
 
 document.body.appendChild(threeScene.renderer.domElement)
+
+gui.domElement.addEventListener(
+	"mousedown",
+	function (event) {
+		event.stopPropagation()
+	},
+	false
+)
 
 window.addEventListener("pointermove", (e) => {
 	threeScene.onPointerMove(e)

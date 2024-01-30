@@ -304,7 +304,8 @@ export class ThreeScene {
 		if (event.buttons === 1) {
 			if (
 				this.mode === Mode.Draw &&
-				this.intersects[0].object.userData.objectType === ObjectType.Fixed
+				this.intersects[0].object.userData.objectType === ObjectType.Fixed &&
+				this.controlPoints.length <= 2
 			) {
 				const cp = addControlPoint(this.intersects[0].point)
 				if (cp) {
